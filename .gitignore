@@ -1,0 +1,7 @@
+node_modules
+dist
+public/mediapipe
+tests/fixtures/generated
+test-results
+playwright-report
+*.log
