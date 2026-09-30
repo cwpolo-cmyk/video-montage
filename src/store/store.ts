@@ -4,6 +4,7 @@ import { detectFaces } from '../analysis/faces';
 import { DEFAULT_PREFS, learnFromEdit, type Edit, type Prefs } from '../analysis/preferences';
 import { frameFeatures, pickBestWindow, windowFeatures } from '../analysis/scoring';
 import { clampCrop, DEFAULT_CROP } from '../crop';
+import { DEFAULT_KEN_BURNS, type KenBurns } from '../kenburns';
 import { renderBitmap, pixelsToDataUrl, pixelsToImageData, renderSample } from '../media/frames';
 import { dropPhoto, getPhoto, isHeic } from '../media/photo';
 import { closeVideoFile, getVideoFile } from '../media/videoFile';
@@ -42,6 +43,8 @@ interface Actions {
   removeClip(clipId: string): void;
   repickUntouched(): void;
   resetPrefs(): void;
+  setKenBurns(clipId: string, effect: KenBurns): void;
+  setKenBurnsAll(effect: KenBurns): void;
 }
 
 export const useStore = create<State & Actions>()((set, get) => ({
@@ -96,7 +99,14 @@ export const useStore = create<State & Actions>()((set, get) => ({
         rotation: 0,
         transfer: 'sdr',
       };
-      const clip: Clip = { id: crypto.randomUUID(), mediaId: id, kind, crop: { ...DEFAULT_CROP }, cropUserSet: false };
+      const clip: Clip = {
+        id: crypto.randomUUID(),
+        mediaId: id,
+        kind,
+        crop: { ...DEFAULT_CROP },
+        cropUserSet: false,
+        ...(kind === 'photo' ? { kenBurns: DEFAULT_KEN_BURNS } : {}),
+      };
       await db.putMedia(meta, file);
       set((s) => ({
         media: { ...s.media, [id]: meta },
@@ -197,6 +207,14 @@ export const useStore = create<State & Actions>()((set, get) => ({
 
   resetPrefs() {
     setEdits([]);
+  },
+
+  setKenBurns(clipId, effect) {
+    updateClip(clipId, { kenBurns: effect });
+  },
+
+  setKenBurnsAll(effect) {
+    set((s) => ({ clips: s.clips.map((c) => (c.kind === 'photo' ? { ...c, kenBurns: effect } : c)) }));
   },
 }));
 

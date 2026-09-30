@@ -3,6 +3,7 @@ import { MAX_ZOOM, OUT_H, OUT_W, SAFE_ZONE } from '../constants';
 import { dragCrop } from '../crop';
 import { ClipPreview } from '../preview/clipPreview';
 import { useStore } from '../store/store';
+import { PhotoMotionBar } from './PhotoMotionBar';
 import { TrimScrubber } from './TrimScrubber';
 
 export function Preview() {
@@ -11,6 +12,8 @@ export function Preview() {
   const [showSafe, setShowSafe] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [playhead, setPlayhead] = useState<number | null>(null);
+  /** Time within a photo's 1.5 s shown when not playing. */
+  const [photoT, setPhotoT] = useState(0);
 
   const clip = useStore((s) => s.clips.find((c) => c.id === s.selectedId) ?? null);
   const meta = useStore((s) => (clip ? s.media[clip.mediaId] : undefined));
@@ -27,7 +30,7 @@ export function Preview() {
   }, []);
 
   // Decode when the clip, media or shown time changes.
-  const showT = clip?.trim?.start ?? 0;
+  const showT = clip?.kind === 'photo' ? photoT : (clip?.trim?.start ?? 0);
   useEffect(() => {
     setPlaying(false);
     setPlayhead(null);
@@ -36,11 +39,22 @@ export function Preview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clip?.id, meta?.id, loaded, showT, clip?.trim?.length]);
 
+  useEffect(() => setPhotoT(0), [clip?.id]);
+
   // Crop changes only need a redraw.
   useEffect(() => {
     if (clip && meta && !playing) previewRef.current?.redraw(clip, meta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clip?.crop.cx, clip?.crop.cy, clip?.crop.zoom]);
+
+  // Picking a Ken Burns move plays it so you can see it.
+  const prevKb = useRef(clip?.kenBurns);
+  useEffect(() => {
+    const changed = prevKb.current !== undefined && prevKb.current !== clip?.kenBurns;
+    prevKb.current = clip?.kenBurns;
+    if (changed && clip?.kind === 'photo' && loaded) startPlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clip?.kenBurns]);
 
   const drag = useRef<{ x: number; y: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
@@ -66,6 +80,18 @@ export function Preview() {
     setCrop(clip.id, { ...clip.crop, zoom });
   };
 
+  const startPlay = () => {
+    const p = previewRef.current;
+    if (!p || !clip) return;
+    setPlaying(true);
+    const id = clip.id;
+    void p.play(() => {
+      const s = useStore.getState();
+      const c = s.clips.find((c) => c.id === id);
+      return c ? { clip: c, meta: s.media[c.mediaId] } : null;
+    });
+  };
+
   const togglePlay = () => {
     const p = previewRef.current;
     if (!p || !clip) return;
@@ -75,13 +101,7 @@ export function Preview() {
       setPlayhead(null);
       p.show({ clip, meta: meta!, t: showT });
     } else {
-      setPlaying(true);
-      const id = clip.id;
-      void p.play(() => {
-        const s = useStore.getState();
-        const c = s.clips.find((c) => c.id === id);
-        return c ? { clip: c, meta: s.media[c.mediaId] } : null;
-      });
+      startPlay();
     }
   };
 
@@ -91,9 +111,14 @@ export function Preview() {
         <label className="toggle">
           <input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Safe zones
         </label>
-        {clip?.kind === 'video' && (
-          <button className="btn" onClick={togglePlay} disabled={!clip.trim} data-testid="play-pick">
-            {playing ? '■ Stop' : '▶ Play pick'}
+        {clip && (
+          <button
+            className="btn"
+            onClick={togglePlay}
+            disabled={!loaded || (clip.kind === 'video' && !clip.trim)}
+            data-testid="play-pick"
+          >
+            {playing ? '■ Stop' : clip.kind === 'video' ? '▶ Play pick' : '▶ Play'}
           </button>
         )}
         <span className="hint">Drag to reposition · scroll to zoom</span>
@@ -115,6 +140,16 @@ export function Preview() {
         </div>
       </div>
       {clip?.kind === 'video' && <TrimScrubber clipId={clip.id} playhead={playing ? playhead : null} />}
+      {clip?.kind === 'photo' && (
+        <PhotoMotionBar
+          t={playing && playhead !== null ? playhead : photoT}
+          onSeek={(t) => {
+            previewRef.current?.stop();
+            setPlaying(false);
+            setPhotoT(t);
+          }}
+        />
+      )}
     </div>
   );
 }

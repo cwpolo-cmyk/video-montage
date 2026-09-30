@@ -1,3 +1,5 @@
+import type { KenBurns } from './kenburns';
+
 export type MediaKind = 'video' | 'photo';
 
 export type Transfer = 'sdr' | 'hlg' | 'pq';
@@ -48,6 +50,8 @@ export interface Clip {
   /** True once the user has repositioned the crop (stops auto face-centering). */
   cropUserSet: boolean;
   trim?: Trim;
+  /** Photos only: the Ken Burns move. */
+  kenBurns?: KenBurns;
 }
 
 export interface Project {

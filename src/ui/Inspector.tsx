@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { FEATURE_LABELS, FEATURES, frameFeatures, windowFeatures } from '../analysis/scoring';
 import { MAX_ZOOM } from '../constants';
 import { DEFAULT_CROP } from '../crop';
+import { DEFAULT_KEN_BURNS, KEN_BURNS_OPTIONS } from '../kenburns';
 import { useStore } from '../store/store';
 
 export function Inspector() {
@@ -9,6 +10,9 @@ export function Inspector() {
   const meta = useStore((s) => (clip ? s.media[clip.mediaId] : undefined));
   const analysis = useStore((s) => (clip ? s.analyses[clip.mediaId] : undefined));
   const setCrop = useStore((s) => s.setCrop);
+  const setKenBurns = useStore((s) => s.setKenBurns);
+  const setKenBurnsAll = useStore((s) => s.setKenBurnsAll);
+  const photoCount = useStore((s) => s.clips.filter((c) => c.kind === 'photo').length);
 
   const why = useMemo(() => {
     if (!analysis || !clip?.trim) return null;
@@ -54,6 +58,40 @@ export function Inspector() {
           Reset crop
         </button>
       </div>
+
+      {clip.kind === 'photo' && (
+        <div className="field" data-testid="ken-burns">
+          <label>
+            Ken Burns <span className="muted">1.5 s · subtle</span>
+          </label>
+          <div className="segmented" role="radiogroup">
+            {KEN_BURNS_OPTIONS.map((o) => {
+              const active = (clip.kenBurns ?? DEFAULT_KEN_BURNS) === o.id;
+              return (
+                <button
+                  key={o.id}
+                  role="radio"
+                  aria-checked={active}
+                  className={active ? 'active' : ''}
+                  data-testid={`kb-${o.id}`}
+                  onClick={() => setKenBurns(clip.id, o.id)}
+                >
+                  <span>{o.icon}</span> {o.label}
+                </button>
+              );
+            })}
+          </div>
+          {photoCount > 1 && (
+            <button
+              className="link"
+              data-testid="kb-apply-all"
+              onClick={() => setKenBurnsAll(clip.kenBurns ?? DEFAULT_KEN_BURNS)}
+            >
+              Use this move on all {photoCount} photos
+            </button>
+          )}
+        </div>
+      )}
 
       {why && (
         <div className="why" data-testid="why">

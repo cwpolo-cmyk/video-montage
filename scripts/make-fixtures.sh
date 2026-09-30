@@ -49,4 +49,7 @@ $FF -f lavfi -i "color=0x00c000:s=900x600" -f lavfi -i "color=magenta:s=900x600"
 heif-enc -q 90 -o "$OUT/photo.heic" "$OUT/heic_src.png" >/dev/null
 rm "$OUT/heic_src.png"
 
+# 7. Portrait photo with a horizontal black -> white gradient (for measuring Ken Burns motion).
+$FF -f lavfi -i "color=black:s=1080x1920" -vf "format=gray,geq=lum='X/W*255'" -frames:v 1 "$OUT/gradient.png"
+
 ls -la "$OUT"

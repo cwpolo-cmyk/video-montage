@@ -10,7 +10,7 @@ Everything runs locally in the browser. Nothing is uploaded.
 | Stage | Scope | State |
 | --- | --- | --- |
 | 1 | Upload, crop, auto-trim | ✅ done |
-| 2 | Photos and Ken Burns | ⏳ |
+| 2 | Photos and Ken Burns | ✅ done |
 | 3 | Text reveals and gradient overlay | ⏳ |
 | 4 | Timeline and preview | ⏳ |
 | 5 | Export | ⏳ |
@@ -38,6 +38,18 @@ npm run dev     # http://localhost:5173
   A 1.5–2.0 s window slides across the clip, and the best-scoring window is picked. Each window's score blends its average quality with its worst frame, so a single blurry moment sinks it.
 - **Learning.** When you move a pick, the app compares your section's scores with the auto pick's. It shifts the weight of each factor accordingly and also records where in the clip you tend to pick and how long you like picks to be. Future videos use what it learned. The *Learned preferences* panel shows the result and has a reset button. Everything is stored in this browser only.
 - **Autosave.** The project, your original files, analysis results and learned preferences are saved in IndexedDB.
+
+## How Stage 2 works
+
+- **Length.** Every photo lasts exactly 1.5 s, which is 45 frames at 30 fps.
+- **Ken Burns.** Each photo gets one of four moves: *zoom in*, *zoom out*, *pan left* or *pan right*. The default is zoom in.
+  - The moves are subtle. Zooms change by 7%, and pans travel about 4.5% of the frame width at 1.06× zoom.
+  - They use sine ease-in-out easing, so the motion starts and stops smoothly.
+  - The last frame lands exactly at the end of the move.
+- **Framing.** The move happens inside your crop, so it never shows anything outside the framing you chose.
+- **Previewing.** Picking a move plays it. You can also scrub the 1.5 s bar under the preview, or use *Play*.
+- **Apply to all.** *Use this move on all photos* copies the current photo's move to every photo.
+- **Shared geometry.** The math lives in `src/kenburns.ts`. `src/render/layout.ts` is the single place that decides what part of the source each frame shows, and preview and export will both use it.
 
 ## Tests
 

@@ -1,15 +1,16 @@
-import { OUT_H, OUT_W } from '../constants';
-import { cropRect } from '../crop';
+import { FPS, OUT_H, OUT_W } from '../constants';
+import { frameCount } from '../kenburns';
 import { Renderer, type UprightTexture } from '../gl/renderer';
 import { getPhoto } from '../media/photo';
 import { getVideoFile } from '../media/videoFile';
+import { clipDuration, clipSourceRect } from '../render/layout';
 import { getMediaBlob } from '../store/db';
 import type { Clip, MediaMeta } from '../types';
 
 export interface ShowRequest {
   clip: Clip;
   meta: MediaMeta;
-  /** Clip-relative source time for videos. */
+  /** Source time for videos; time within the clip (0..1.5 s) for photos. */
   t: number;
 }
 
@@ -25,6 +26,8 @@ export class ClipPreview {
   private busy = false;
   private pending: (() => Promise<void>) | null = null;
   private playToken = 0;
+  /** Clip-local time used for photo motion. */
+  private photoT = 0;
   onFrame?: (t: number) => void;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -34,10 +37,11 @@ export class ClipPreview {
     this.upright = this.renderer.createUpright();
   }
 
-  /** Redraw with a new crop without decoding again. */
+  /** Redraw with a new crop/effect without decoding again. */
   redraw(clip: Clip, meta: MediaMeta) {
     if (!this.upright.width) return;
-    this.renderer.drawLayers([{ src: this.upright, rect: cropRect(meta.width, meta.height, clip.crop), opacity: 1 }]);
+    const t = clip.kind === 'photo' ? this.photoT : 0;
+    this.renderer.drawLayers([{ src: this.upright, rect: clipSourceRect(clip, meta, t), opacity: 1 }]);
   }
 
   show(req: ShowRequest) {
@@ -63,6 +67,7 @@ export class ClipPreview {
 
   private async load({ clip, meta, t }: ShowRequest) {
     if (meta.kind === 'photo') {
+      this.photoT = t;
       const key = `p:${meta.id}`;
       if (this.uprightKey !== key) {
         const bmp = await getPhoto(meta.id, () => getMediaBlob(meta.id), meta.name);
@@ -92,11 +97,12 @@ export class ClipPreview {
     this.redraw(clip, meta);
   }
 
-  /** Loops the clip's trimmed window at real speed until stop(). */
+  /** Loops the clip (a video's trimmed window, or a photo's Ken Burns) at real speed until stop(). */
   async play(get: () => { clip: Clip; meta: MediaMeta } | null) {
     this.stop();
     const token = ++this.playToken;
     const first = get();
+    if (first?.clip.kind === 'photo') return this.playPhoto(get, token);
     if (!first?.clip.trim) return;
     const vf = await getVideoFile(first.meta.id, () => getMediaBlob(first.meta.id));
     while (token === this.playToken) {
@@ -122,6 +128,30 @@ export class ClipPreview {
         if (now) this.redraw(now.clip, now.meta);
         this.onFrame?.(rel);
       }
+    }
+  }
+
+  private async playPhoto(get: () => { clip: Clip; meta: MediaMeta } | null, token: number) {
+    const first = get()!;
+    await new Promise<void>((resolve) => this.schedule(async () => {
+      await this.load({ ...first, t: 0 });
+      resolve();
+    }));
+    while (token === this.playToken) {
+      const t0 = performance.now();
+      const n = frameCount(clipDuration(first.clip));
+      for (let i = 0; i < n; i++) {
+        while (performance.now() < t0 + (i * 1000) / FPS - 4) await nextFrame();
+        if (token !== this.playToken) return;
+        const cur = get();
+        if (!cur) return;
+        this.photoT = i / FPS;
+        this.redraw(cur.clip, cur.meta);
+        this.onFrame?.(this.photoT);
+      }
+      // Hold the last frame briefly so the loop point is visible.
+      const hold = performance.now() + 400;
+      while (performance.now() < hold) await nextFrame();
     }
   }
 

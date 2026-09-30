@@ -534,3 +534,38 @@ button {
   align-items: center;
   margin-top: 10px;
 }
+
+.photo-track {
+  height: 28px;
+  background: var(--panel-2);
+}
+.photo-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(255, 79, 123, 0.35), rgba(255, 179, 71, 0.35));
+}
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.segmented button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+.segmented button.active {
+  border-color: var(--accent);
+  background: #3a1624;
+}
+.field + .field {
+  margin-top: 14px;
+}
